@@ -18,7 +18,7 @@ require_once 'libs/userregistration.class.php';
 
 class RegistrationRecaptchaAction extends WikkaAction {
 
-    var $version = '0.1.20120731';
+    var $version = '0.2.20130512';
 
     # parameter defaults
     var $password_min_length                = 5;
