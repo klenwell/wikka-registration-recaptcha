@@ -3,6 +3,10 @@
  * registrationrecaptcha.php
  * Test extension of user settings action
  *
+ * IMPORTANT NOTE:
+ * The switch block in is_valid_registration method should be verified against
+ * the latest version of usersettings.php in the wikkawiki source code.
+ *
  * References
  *      http://klenwell.com/is/WikkaRegistrationRecaptcha
  *      http://klenwell.com/is/WikkaBaseActionClass
@@ -21,22 +25,22 @@ class RegistrationRecaptchaAction extends WikkaAction {
     var $version = '0.2.20130512';
 
     # parameter defaults
-    var $password_min_length                = 5;
-    var $valid_email_pattern                = '/^.+?\@.+?\..+$/';
+    var $password_min_length            = 5;
+    var $valid_email_pattern            = '/^.+?\@.+?\..+$/';
 
     # requests
-    var $new_user_is_registering            = FALSE;
-    var $has_submitted_recaptcha            = FALSE;
+    var $new_user_is_registering        = FALSE;
+    var $has_submitted_recaptcha        = FALSE;
    
     # user interface
-    var $button_recaptcha                   = 'Submit ReCAPTCHA';
+    var $button_recaptcha               = 'Submit ReCAPTCHA';
    
     # other
-    var $UserAuth                           = NULL;
+    var $UserAuth                       = NULL;
+    var $session_intercept_key          = 'registration_recaptcha_intercept';
 
 
-    function main()
-    {
+    function main() {
         $this->action_set_up();
 
         # request tree
@@ -58,8 +62,7 @@ class RegistrationRecaptchaAction extends WikkaAction {
         }
     }
    
-    function action_set_up()
-    {
+    function action_set_up() {
         $this->UserAuth = new URAuth($this->Wikka);        
        
         # these values are set in usersettings -- not sure if they're
@@ -75,18 +78,19 @@ class RegistrationRecaptchaAction extends WikkaAction {
 
         # request tree
         $this->new_user_is_registering =
-            ($this->Wikka->GetSafeVar('submit', 'post') == T_("Register"))
-            && $this->get_config('allow_user_registration');
+            ($this->Wikka->GetSafeVar('submit', 'post') == T_("Register")) &&
+                $this->get_config('allow_user_registration');
            
         $this->has_submitted_recaptcha =
-            $this->Wikka->GetSafeVar('recaptcha_submit', 'post') == $this->button_recaptcha
-            && $this->get_config('allow_user_registration');
+            $this->Wikka->GetSafeVar('recaptcha_submit', 'post') ==
+                ($this->button_recaptcha &&
+                    $this->get_config('allow_user_registration'));
     }
    
     function challenge_with_recaptcha() {
-        # if registration is not valid, let post pass so that
-        # usersettings plugin will display proper warning
-        if ( !$this->is_valid_registration() ) {
+        # If registration is not valid, let post pass so that
+        # usersettings plugin will display proper warning.
+        if ( ! $this->is_valid_registration() ) {
             return $this->html_comment("invalid registration form");
         }
         else {
@@ -96,13 +100,15 @@ class RegistrationRecaptchaAction extends WikkaAction {
     }
    
     function is_valid_registration() {
-        # this is effectively lifted from usersettings.php. Very un-DRY.
+        # This is effectively lifted from usersettings.php. Very un-DRY.
+        # Whenever that changes (say, between versions), this should be
+        # updated.
         $name = trim($this->Wikka->GetSafeVar('name', 'post'));
         $email = trim($this->Wikka->GetSafeVar('email', 'post'));
         $password = $this->Wikka->GetSafeVar('password', 'post');
         $confpassword = $this->Wikka->GetSafeVar('confpassword', 'post');
 
-        // validate input
+        # validate input
         switch(TRUE) {
             case (FALSE===$this->UserAuth->URAuthVerify()):
             case (isset($_POST['name']) && TRUE === $this->Wikka->existsUser(
@@ -142,13 +148,13 @@ class RegistrationRecaptchaAction extends WikkaAction {
     }
    
     function intercept_registration() {
-        $_SESSION['reg_intercept'] = $_POST;
+        $_SESSION[$this->session_intercept_key] = $_POST;
         $_POST['submit'] = NULL;
     }
    
     function unintercept_registration() {
-        $_POST = $_SESSION['reg_intercept'];
-        $_SESSION['reg_intercept'] = NULL;
+        $_POST = $_SESSION[$this->session_intercept_key];
+        $_SESSION[$this->session_intercept_key] = NULL;
     }
    
     function show_recaptcha_form($error=NULL) {
@@ -180,9 +186,8 @@ XHTML;
     function html_comment($comment) {
         return sprintf("\n\n<!-- RegistrationRecaptcha: %s -->\n\n", $comment);
     }
-   
-
 }
+
 
 # Main Routine
 try {
